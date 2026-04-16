@@ -104,7 +104,9 @@ def send_digest_email(hours: int = 24, top_n: int = 10) -> dict:
 
 if __name__ == "__main__":
     result = send_digest_email(hours=24, top_n=10)
-    if result["success"]:
+    if result.get("skipped"):
+        print(result["message"])
+    elif result["success"]:
         print("\n=== Email Digest Sent ===")
         print(f"Subject: {result['subject']}")
         print(f"Articles: {result['articles_count']}")

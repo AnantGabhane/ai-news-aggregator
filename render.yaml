@@ -5,20 +5,28 @@ databases:
     plan: free
 
 services:
-  - type: cron
-    name: daily-digest-job
-    env: docker
-    dockerfilePath: ./Dockerfile
-    schedule: "0 5 * * *"
-    dockerCommand: python main.py
+  - type: web
+    name: ai-news-aggregator
+    env: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn app.web:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: ai-news-aggregator-db
           property: connectionString
+      - key: ENVIRONMENT
+        value: PRODUCTION
       - key: OPENAI_API_KEY
         sync: false
       - key: MY_EMAIL
         sync: false
-      - key: APP_PASSWORD
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_REPLY_TO
+        sync: false
+      - key: RUN_API_TOKEN
         sync: false

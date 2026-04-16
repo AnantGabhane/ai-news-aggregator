@@ -7,42 +7,51 @@
 2. Sign up (free account works)
 3. Verify email
 
-### Step 2: Deploy from GitHub
-1. In Render dashboard: **New** → **Blueprint**
+### Step 2: Create a Web Service
+1. In Render dashboard: **New** → **Web Service**
 2. Connect GitHub (if not connected)
 3. Select repository: `ai-news-aggregator`
 4. Select branch: `deployment`
-5. Click **Apply** (Render reads `render.yaml` automatically)
+5. Use these settings:
+
+```text
+Build Command: pip install uv && uv sync --frozen
+Start Command: uv run uvicorn app.web:app --host 0.0.0.0 --port $PORT
+```
 
 ### Step 3: Set Environment Variables
-After services are created, go to `daily-digest-job` → **Environment** tab:
+After the service is created, go to `ai-news-aggregator` → **Environment** tab:
 
 ```
 OPENAI_API_KEY=sk-...
 MY_EMAIL=your.email@gmail.com
-APP_PASSWORD=your_16_char_app_password
+RESEND_API_KEY=re_...
+EMAIL_FROM=AI News Digest <onboarding@resend.dev>
+RUN_API_TOKEN=your_long_random_secret
 ```
 
 **Note**: `DATABASE_URL` is auto-set by Render - don't add it manually!
 
 ### Step 4: Test
-1. Go to `daily-digest-job` → **Logs**
-2. Click **Manual Deploy** to test immediately
-3. Check your email inbox
+1. Open your deployed web service URL
+2. Confirm `/health` returns healthy JSON
+3. Trigger the pipeline from your scheduler or terminal:
+
+```bash
+curl -X POST https://your-service.onrender.com/run \
+  -H "Authorization: Bearer your_long_random_secret" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 24, "top_n": 10}'
+```
 
 ## ✅ What Gets Created
 
 - **PostgreSQL Database**: `ai-news-aggregator-db` (free tier)
-- **Cron Job**: Runs `python main.py` daily at midnight UTC
+- **Web Service**: Runs FastAPI on the free plan
 
-## 📝 Schedule Customization
+## 📝 Scheduling
 
-Edit `render.yaml` to change schedule:
-```yaml
-schedule: "0 8 * * *"  # 8 AM UTC instead of midnight
-```
-
-Then push to GitHub - Render auto-updates.
+Use an external scheduler like GitHub Actions or cron-job.org to call `POST /run`.
 
 ## 🔍 Troubleshooting
 
@@ -51,12 +60,13 @@ Then push to GitHub - Render auto-updates.
 - Verify database service is running
 
 **Email not sending?**
-- Verify Gmail app password (not regular password)
-- Check `MY_EMAIL` and `APP_PASSWORD` are correct
+- Verify `RESEND_API_KEY` and `EMAIL_FROM` are set
+- Check that your sender address is allowed in Resend
 
-**Cron not running?**
-- Check logs in Render dashboard
-- Verify schedule syntax
+**Pipeline not starting?**
+- Check `RUN_API_TOKEN`
+- Confirm your scheduler sends `Authorization: Bearer <token>`
+- Review the `/run/status` endpoint with the same token
 
 ## 📚 Full Documentation
 

@@ -21,7 +21,7 @@ graph LR
     D --> C
     C --> E[Curator<br/>LLM Ranking]
     E --> F[Email<br/>Personalized Digest]
-    F --> G[Delivery<br/>Gmail SMTP]
+    F --> G[Delivery<br/>Resend API]
     
     style A fill:#e1f5ff
     style B fill:#fff4e1
@@ -57,7 +57,7 @@ graph LR
    - Marks digests as sent to prevent duplicates
 
 5. **Delivery** (`app/services/email.py`)
-   - Sends HTML email via Gmail SMTP
+   - Sends HTML email via Resend API
 
 ### Daily Pipeline
 
@@ -155,7 +155,7 @@ class CustomScraper:
 - Python 3.12+
 - PostgreSQL database
 - OpenAI API key
-- Gmail app password (for email sending)
+- Resend API key and verified sender address (for email sending)
 - Webshare proxy credentials (optional, for YouTube transcript fetching)
 
 ### Installation
@@ -170,7 +170,9 @@ class CustomScraper:
    ```bash
    OPENAI_API_KEY=your_key
    MY_EMAIL=your_email@gmail.com
-   APP_PASSWORD=your_gmail_app_password
+   RESEND_API_KEY=your_resend_api_key
+   EMAIL_FROM="AI News Digest <onboarding@resend.dev>"
+   RUN_API_TOKEN=your_long_random_secret
    DATABASE_URL=postgresql://user:pass@host:port/db
    ENVIRONMENT=LOCAL  # Optional: auto-detected from DATABASE_URL if contains "render.com"
    
@@ -227,10 +229,19 @@ uv run python -m app.services.process_email
 The project is configured for deployment on Render.com:
 
 1. **Database**: PostgreSQL service (auto-configured)
-2. **Cron Job**: Scheduled daily execution via `render.yaml`
-3. **Environment**: Automatically detected as PRODUCTION when `DATABASE_URL` contains "render.com" (no manual setting needed)
+2. **Web Service**: FastAPI service exposed by `app.web:app`
+3. **Triggering**: Secure `POST /run` endpoint for external schedulers
+4. **Environment**: Automatically detected as PRODUCTION when `DATABASE_URL` contains "render.com" (no manual setting needed)
 
-See `RENDER_SETUP.md` for detailed deployment instructions.
+You can trigger the pipeline with:
+```bash
+curl -X POST https://your-service.onrender.com/run \
+  -H "Authorization: Bearer $RUN_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 24, "top_n": 10}'
+```
+
+See `docs/RENDER_SETUP.md` for detailed deployment instructions.
 
 ### Docker
 

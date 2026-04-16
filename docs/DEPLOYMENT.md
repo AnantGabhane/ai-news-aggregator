@@ -1,13 +1,13 @@
 # Deployment Guide: Render.com
 
-This guide walks you through deploying the AI News Aggregator to Render.com with PostgreSQL and scheduled daily execution.
+This guide walks you through deploying the AI News Aggregator to Render.com as a free web service with PostgreSQL and an externally triggered pipeline.
 
 ## Prerequisites
 
 - Render.com account (sign up at https://render.com)
 - GitHub account with this repository
 - OpenAI API key
-- Gmail account with app password (for email sending)
+- Resend account with API key and a sender address
 
 ## Step-by-Step Deployment
 
@@ -19,67 +19,62 @@ This guide walks you through deploying the AI News Aggregator to Render.com with
 
 ### 2. Connect GitHub Repository
 
-1. In Render dashboard, click "New" → "Blueprint"
+1. In Render dashboard, click "New" → "Web Service"
 2. Connect your GitHub account if not already connected
 3. Select the repository: `ai-news-aggregator`
-4. Select the branch: `deployment` (or `master` if you merge)
-5. Render will detect `render.yaml` automatically
+4. Select the branch: `deployment` (or your merged branch)
+5. Use these commands:
+   ```text
+   Build Command: pip install uv && uv sync --frozen
+   Start Command: uv run uvicorn app.web:app --host 0.0.0.0 --port $PORT
+   ```
 
-### 3. Review Blueprint Configuration
+### 3. Review Service Configuration
 
-Render will read `render.yaml` and show you:
+Render will provision:
 - **PostgreSQL Database**: `ai-news-aggregator-db`
-- **Cron Job**: `daily-digest-job` (runs daily at midnight UTC)
+- **Web Service**: `ai-news-aggregator`
 
-Click "Apply" to create these services.
+Create the database first, then connect its `DATABASE_URL` to the web service.
 
 ### 4. Set Environment Variables
 
-After services are created, you need to set environment variables for the cron job:
+After services are created, you need to set environment variables for the web service:
 
-1. Go to the `daily-digest-job` service in Render dashboard
+1. Go to the `ai-news-aggregator` service in Render dashboard
 2. Navigate to "Environment" tab
 3. Add the following variables:
 
 ```
 OPENAI_API_KEY=your_openai_api_key_here
 MY_EMAIL=your_email@gmail.com
-APP_PASSWORD=your_gmail_app_password_here
+RESEND_API_KEY=your_resend_api_key_here
+EMAIL_FROM=AI News Digest <onboarding@resend.dev>
+RUN_API_TOKEN=your_long_random_secret
 ```
 
 **Note**: `DATABASE_URL` is automatically set by Render - you don't need to add it manually.
 
 ### 5. Initialize Database
 
-The database tables will be created automatically when the cron job runs for the first time (via `app.database.create_tables` in the Dockerfile).
-
-Alternatively, you can manually trigger table creation:
-
-1. Go to the cron job service
-2. Click "Manual Deploy" → "Deploy latest commit"
-3. Or wait for the scheduled run
+The database tables are created automatically when the web service starts and again before each pipeline run.
 
 ### 6. Verify Deployment
 
-1. Check the cron job logs in Render dashboard
-2. Look for successful execution messages
-3. Verify email was sent (check your inbox)
-
-### 7. Adjust Schedule (Optional)
-
-To change when the daily digest runs:
-
-1. Edit `render.yaml`:
-   ```yaml
-   schedule: "0 8 * * *"  # 8 AM UTC instead of midnight
+1. Check the web service logs in Render dashboard
+2. Verify `GET /health` returns healthy JSON
+3. Trigger the pipeline:
+   ```bash
+   curl -X POST https://your-service.onrender.com/run \
+     -H "Authorization: Bearer your_long_random_secret" \
+     -H "Content-Type: application/json" \
+     -d '{"hours": 24, "top_n": 10}'
    ```
-2. Push changes to GitHub
-3. Render will automatically update
+4. Verify email was sent (check your inbox)
 
-**Cron Schedule Format**: `minute hour day month weekday`
-- `0 0 * * *` = Daily at midnight UTC
-- `0 8 * * *` = Daily at 8 AM UTC
-- `0 0 * * 1` = Every Monday at midnight UTC
+### 7. Add an External Scheduler
+
+Use GitHub Actions, cron-job.org, or another scheduler to call `POST /run` on your Render service.
 
 ## Environment Variables Reference
 
@@ -87,8 +82,10 @@ To change when the daily digest runs:
 |----------|----------|-------------|--------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string | Auto-set by Render |
 | `OPENAI_API_KEY` | Yes | OpenAI API key for LLM | Render dashboard |
-| `MY_EMAIL` | Yes | Gmail address for sending | Render dashboard |
-| `APP_PASSWORD` | Yes | Gmail app password | Render dashboard |
+| `MY_EMAIL` | Yes | Digest recipient email address | Render dashboard |
+| `RESEND_API_KEY` | Yes | Resend API key for outbound email | Render dashboard |
+| `EMAIL_FROM` | Yes | Verified sender used by Resend | Render dashboard |
+| `RUN_API_TOKEN` | Yes | Shared secret for `POST /run` | Render dashboard |
 
 ## Troubleshooting
 
@@ -98,16 +95,16 @@ To change when the daily digest runs:
 - Check database service is running
 - Verify network connectivity between services
 
-### Cron Job Not Running
+### Pipeline Endpoint Not Running
 
-- Check cron job logs in Render dashboard
-- Verify schedule syntax in `render.yaml`
-- Ensure Docker build succeeded
+- Check web service logs in Render dashboard
+- Verify the service is listening on `$PORT`
+- Confirm your scheduler is sending the correct bearer token
 
 ### Email Not Sending
 
-- Verify `MY_EMAIL` and `APP_PASSWORD` are correct
-- Check Gmail app password is valid (not regular password)
+- Verify `MY_EMAIL`, `RESEND_API_KEY`, and `EMAIL_FROM` are correct
+- Check that the sender address is allowed in Resend
 - Review email service logs for errors
 
 ### Build Failures
@@ -132,7 +129,7 @@ This starts PostgreSQL locally. Set environment variables in `.env` file (copy f
 1. Make changes to code
 2. Commit and push to GitHub
 3. Render automatically rebuilds and redeploys
-4. For cron jobs, changes take effect on next scheduled run
+4. Trigger the `/run` endpoint after deploy to execute the latest code
 
 ## Cost Considerations
 
@@ -148,7 +145,7 @@ This starts PostgreSQL locally. Set environment variables in `.env` file (copy f
 
 - **Logs**: View in Render dashboard under each service
 - **Database**: Check connection count and storage usage
-- **Cron Jobs**: Monitor execution history and success rate
+- **Run Status Endpoint**: Monitor `/run/status` for the latest run outcome
 
 ## Support
 
