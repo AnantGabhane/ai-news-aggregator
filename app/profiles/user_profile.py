@@ -23,4 +23,3 @@ USER_PROFILE = {
     },
     "expertise_level": "Advanced"
 }
-
