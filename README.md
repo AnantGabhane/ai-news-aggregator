@@ -271,6 +271,21 @@ docker run --env-file .env ai-news-aggregator
 - **youtube-transcript-api**: Video transcripts
 - **UV**: Package management
 
+##
+Proof of work 
+- Render dashboard
+   - ![alt text](image.png)
+
+- Cron jobs dashboard
+   - ![alt text](image-1.png)
+
+- Resend Email Service
+   - ![alt text](image-2.png)
+
+- Check health
+   - https://ai-news-aggregator-2-24ug.onrender.com/
+- Email Received 
+   - ![alt text](image-3.png)
 ## License
 
 MIT
